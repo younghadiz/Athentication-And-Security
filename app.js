@@ -1,4 +1,4 @@
-
+require('dotenv').config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
@@ -7,6 +7,8 @@ const encrypt = require("mongoose-encryption");
 
 const app = express();
 
+console.log(process.env.API_KEY);
+  
 app.use(express.static("public"));
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({
@@ -25,9 +27,9 @@ const userSchema = new mongoose.Schema({
 //model for user schema
 const User = new mongoose.model("User", userSchema);
 
-//the two lines of code below served as our encryption code for 'password' or any field we want
-const secret = "AnythingCanBeWriteHereAsSecret.";
-userSchema.plugin(encrypt, {secret:secret, encryptedFields: ["password"]});
+//the line of code below served as our encryption code for 'password' or any field we want
+
+userSchema.plugin(encrypt, {secret:process.env.SECRET, encryptedFields: ["password"]});
 
 
 app.get("/", function(req, res){
