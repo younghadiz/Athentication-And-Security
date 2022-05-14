@@ -3,7 +3,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-
+const encrypt = require("mongoose-encryption");
 
 const app = express();
 
@@ -16,15 +16,18 @@ app.use(bodyParser.urlencoded({
 //connect mongoose to mongodb
 mongoose.connect("mongodb://localhost:27017/userDB", {useNewUrlParser: true});
 
-
-//user schema
-const userSchema = {
+//user table schema created with mongoose
+const userSchema = new mongoose.Schema({
 	email: String,
 	password: String
-};
+});
 
 //model for user schema
 const User = new mongoose.model("User", userSchema);
+
+//the two lines of code below served as our encryption code for 'password' or any field we want
+const secret = "AnythingCanBeWriteHereAsSecret.";
+userSchema.plugin(encrypt, {secret:secret, encryptedFields: ["password"]});
 
 
 app.get("/", function(req, res){
