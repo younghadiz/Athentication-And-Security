@@ -9,7 +9,9 @@ const session = require('express-session');
 const passport = require("passport");
 const passportLocal = require('passport-local');
 const passportLocalMongoose = require('passport-local-mongoose');
-
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const FacebookStrategy = require('passport-facebook').Strategy;
+const findOrCreate = require('mongoose-findorcreate');
 
 const app = express();
 
@@ -37,21 +39,91 @@ mongoose.connect("mongodb://localhost:27017/"+databaseName, {useNewUrlParser: tr
 //user table schema created with mongoose
 const userSchema = new mongoose.Schema({
 	email: String,
-	password: String
+	password: String,
+  googleId: String,
+  facebookId: String,
+  name: String
 });
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 //model for user schema
 const User = new mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+
+passport.serializeUser(function(user, done){
+	done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done){
+	User.findById(id, function(err, user){
+		done(err, user);
+	});
+});
+
+//setting up OAuth2.0 Strategy for Google login
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+	userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    // console.log(profile);
+    User.findOrCreate({ googleId: profile.id, username: profile.name.givenName }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+//setting up OAuth2.0 Strategy for Facebook Login
+passport.use(new FacebookStrategy({
+    clientID: process.env.FACEBOOK_APP_ID,
+    clientSecret: process.env.FACEBOOK_APP_SECRET,
+    callbackURL: "http://localhost:3000/auth/facebook/secrets"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    //i added conditional statement for facebook name
+    User.findOrCreate({ facebookId: profile.id, name: profile.displayName }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
 
 app.get("/", function(req, res){
 	res.render("home");
 });
+
+//for google endpoints login
+app.get("/auth/google",
+  //now lets initiate authentication with google using passport
+  passport.authenticate('google', {scope: ["profile"] })
+);
+//for google callback login
+app.get("/auth/google/secrets",
+	passport.authenticate('google', { failureRedirect: "/login" }),
+	function(req, res) {
+		//Successful authentication, then redirect user to 'app.get(/secrets)' to check again if the user is authenticated or redirect the user back to login page.
+		res.redirect("/secrets");
+	});
+
+  //for facebook endpoints
+  app.get("/auth/facebook",
+    //now lets initiate authentication with facebook using passport
+    passport.authenticate('facebook')
+  );
+
+  //for facebook callback
+  app.get("/auth/facebook/secrets",
+    passport.authenticate('facebook', { failureRedirect: "/login" }),
+    function(req, res) {
+      //Successful authentication, then redirect user to 'app.get(/secrets)' to check again if the user is authenticated or redirect the user back to login page.
+  		res.redirect('/secrets');
+    });
+
 
 app.get("/login", function(req, res){
 	res.render("login");
@@ -72,7 +144,7 @@ app.get("/secrets", function(req, res){
 
 app.get("/logout", function(req, res){
 	req.logout();
-	res.redirect("/"); 
+	res.redirect("/");
 });
 
 // register post route - New User Registration
