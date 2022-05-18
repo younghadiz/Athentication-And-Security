@@ -42,7 +42,8 @@ const userSchema = new mongoose.Schema({
 	password: String,
   googleId: String,
   facebookId: String,
-  name: String
+  name: String,
+  secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -133,13 +134,49 @@ app.get("/register", function(req, res){
 	res.render("register");
 });
 
+//get secret route page
 app.get("/secrets", function(req, res){
-    // console.log(req.isAuthenticated());
+	User.find({"secret": {$ne: null}}, function(err, foundUsers){
+		if(err){
+			console.log(err);
+		}else{
+			if(foundUsers){
+				res.render("secrets", {usersWithSecrets: foundUsers});
+			}
+		}
+	});
+});
+
+//get secret submit route page
+app.get("/submit", function(req, res){
 	if(req.isAuthenticated()){
-		res.render("secrets");
+		res.render("submit");
 	} else {
 		res.redirect("/login");
 	}
+});
+
+//secret post submit function
+app.post("/submit", function(req, res){
+	const submittedSecret = req.body.secret;
+
+	User.findById(req.user.id, function(err, foundUser){
+		if(err){
+			console.log(err);
+		}else{
+			if(foundUser){
+				foundUser.secret = submittedSecret;
+				foundUser.save(function(){
+					res.redirect("/secrets");
+				});
+			}
+		}
+	});
+
+	//this console below was used to fetch the current session user details from database including the user ID.
+	// console.log(req.user);
+	//this console below was used to fetch the current session user
+	//console.log(req.user.id);
 });
 
 app.get("/logout", function(req, res){
